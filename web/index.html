@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Sticker Reminder</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Sticker Reminder</h1>
+      <p class="sub">Plate &amp; city sticker renewals</p>
+    </header>
+
+    <section class="card" id="plate-card">
+      <div class="card-head">
+        <h2>Plate sticker</h2>
+        <span class="badge" id="plate-status"></span>
+      </div>
+      <div class="field">
+        <span>Renewal date</span>
+        <div class="datesel">
+          <select id="plate-month" class="ds-month" aria-label="Month"></select>
+          <select id="plate-day" class="ds-day" aria-label="Day"></select>
+          <select id="plate-year" class="ds-year" aria-label="Year"></select>
+        </div>
+      </div>
+      <label class="field">
+        <span>Renews every</span>
+        <select id="plate-cycle">
+          <option value="1">1 year</option>
+          <option value="2" selected>2 years</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Register ID</span>
+        <input type="text" id="plate-regid" autocomplete="off" inputmode="text" placeholder="Plate / registration ID">
+      </label>
+      <label class="field">
+        <span>PIN</span>
+        <div class="secret">
+          <input type="password" id="plate-pin" autocomplete="off" inputmode="numeric" placeholder="Renewal PIN">
+          <button type="button" class="reveal" data-reveal="plate-pin">Show</button>
+        </div>
+      </label>
+      <div class="row">
+        <button type="button" class="ghost" data-renew="plate">Renewed today</button>
+        <button type="button" class="ghost undo hidden" id="plate-undo" data-undo="plate">Undo</button>
+      </div>
+    </section>
+
+    <section class="card" id="city-card">
+      <div class="card-head">
+        <h2>City sticker</h2>
+        <span class="badge" id="city-status"></span>
+      </div>
+      <div class="field">
+        <span>Renewal date</span>
+        <div class="datesel">
+          <select id="city-month" class="ds-month" aria-label="Month"></select>
+          <select id="city-day" class="ds-day" aria-label="Day"></select>
+          <select id="city-year" class="ds-year" aria-label="Year"></select>
+        </div>
+      </div>
+      <label class="field">
+        <span>Renews every</span>
+        <select id="city-cycle">
+          <option value="1">1 year</option>
+          <option value="2" selected>2 years</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Register ID</span>
+        <input type="text" id="city-regid" autocomplete="off" inputmode="text" placeholder="Account / registration ID">
+      </label>
+      <label class="field">
+        <span>PIN</span>
+        <div class="secret">
+          <input type="password" id="city-pin" autocomplete="off" inputmode="numeric" placeholder="Renewal PIN">
+          <button type="button" class="reveal" data-reveal="city-pin">Show</button>
+        </div>
+      </label>
+      <div class="row">
+        <button type="button" class="ghost" data-renew="city">Renewed today</button>
+        <button type="button" class="ghost undo hidden" id="city-undo" data-undo="city">Undo</button>
+      </div>
+    </section>
+
+    <p class="note">Alerts at 30, 14, 7, 1, and 0 days before each date. Your Register ID and PIN are stored only on this device — never uploaded.</p>
+
+    <button type="button" class="primary" id="save-btn">Save &amp; enable reminders</button>
+    <button type="button" class="ghost" id="calendar-btn">Add reminders to calendar</button>
+    <button type="button" class="install hidden" id="install-btn">Install on phone</button>
+    <p class="hint hidden" id="ios-hint">On iPhone: Share → Add to Home Screen</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

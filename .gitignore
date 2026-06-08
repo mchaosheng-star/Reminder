@@ -1,0 +1,4 @@
+config.json
+*.ics
+secrets.json
+.env
