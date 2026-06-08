@@ -3,15 +3,20 @@
   "version": "1.0.0",
   "main": "expo/AppEntry.js",
   "scripts": {
-    "start": "expo start"
+    "start": "expo start",
+    "web": "expo start --web",
+    "build:web": "expo export --platform web --output-dir dist && node scripts/fix-gh-pages.js"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~5.0.5",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/datetimepicker": "8.3.0",
     "expo": "~53.0.0",
     "expo-notifications": "~0.31.0",
     "expo-status-bar": "~2.2.0",
     "react": "19.0.0",
-    "react-native": "0.79.2"
+    "react-dom": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-web": "^0.20.0"
   }
 }

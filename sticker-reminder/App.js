@@ -22,6 +22,7 @@ const DEFAULT_VEHICLE = {
   plateDate: new Date(2026, 5, 30),
   cityDate: new Date(2026, 6, 15),
 };
+const IS_WEB = Platform.OS === "web";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -32,6 +33,7 @@ Notifications.setNotificationHandler({
 });
 
 async function requestPermission() {
+  if (IS_WEB) return true;
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === "granted") return true;
   const { status } = await Notifications.requestPermissionsAsync();
@@ -59,6 +61,16 @@ function daysUntil(date) {
   const target = new Date(date);
   target.setHours(0, 0, 0, 0);
   return Math.round((target - today) / 86400000);
+}
+
+function toInputDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function fromInputDate(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
 }
 
 function createVehicle(index) {
@@ -95,6 +107,7 @@ function normalizeVehicles(data) {
 }
 
 async function scheduleReminders(vehicles) {
+  if (IS_WEB) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
   const items = vehicles.flatMap((vehicle) => [
     { name: `${vehicle.name} plate sticker`, date: vehicle.plateDate },
@@ -124,6 +137,29 @@ async function scheduleReminders(vehicles) {
 
 function DateField({ label, value, onChange }) {
   const [show, setShow] = useState(false);
+
+  if (IS_WEB) {
+    return (
+      <View style={styles.field}>
+        <Text style={styles.label}>{label}</Text>
+        <TextInput
+          style={styles.input}
+          value={toInputDate(value)}
+          onChangeText={(text) => {
+            const nextDate = fromInputDate(text);
+            if (nextDate) onChange(nextDate);
+          }}
+        />
+        <Text style={styles.daysLeft}>
+          {daysUntil(value) < 0
+            ? "Expired"
+            : daysUntil(value) === 0
+              ? "Due today"
+              : `${daysUntil(value)} days left`}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.field}>
@@ -208,7 +244,7 @@ export default function App() {
       })
     );
     await scheduleReminders(vehicles);
-    Alert.alert("Saved", "Reminders scheduled on this phone.");
+    Alert.alert("Saved", IS_WEB ? "Saved in this browser." : "Reminders scheduled on this phone.");
   }
 
   if (!ready) return null;
@@ -217,9 +253,7 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Sticker Reminder</Text>
-        <Text style={styles.sub}>
-          Runs on your phone. No Mac or Xcode needed — use Expo Go.
-        </Text>
+        <Text style={styles.sub}>Plate and city sticker renewals</Text>
 
         {vehicles.map((vehicle, index) => (
           <View key={vehicle.id} style={styles.vehicleCard}>
