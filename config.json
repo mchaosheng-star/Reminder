@@ -1,0 +1,11 @@
+{
+  "plate_sticker": {
+    "name": "Plate sticker",
+    "renewal_date": "2026-06-30"
+  },
+  "city_sticker": {
+    "name": "City sticker",
+    "renewal_date": "2026-07-15"
+  },
+  "remind_days_before": [30, 14, 7, 1, 0]
+}

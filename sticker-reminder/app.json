@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Sticker Reminder",
+    "slug": "sticker-reminder",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.stickerreminder.app"
+    },
+    "android": {
+      "package": "com.stickerreminder.app"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "sounds": []
+        }
+      ]
+    ]
+  }
+}
