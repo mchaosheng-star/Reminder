@@ -1,66 +1,57 @@
 const REMIND_DAYS = [30, 14, 7, 1, 0];
 const STORAGE_KEY = "sticker-reminder-v1";
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const KINDS = [
+  { key: "plate", label: "Plate sticker", idph: "Plate / registration ID" },
+  { key: "city", label: "City sticker", idph: "Account / registration ID" },
+];
 
 const $ = (id) => document.getElementById(id);
-
-const fields = {
-  plate: { month: $("plate-month"), day: $("plate-day"), year: $("plate-year"), cycle: $("plate-cycle"), status: $("plate-status"), regid: $("plate-regid"), pin: $("plate-pin"), name: "Plate sticker" },
-  city: { month: $("city-month"), day: $("city-day"), year: $("city-year"), cycle: $("city-cycle"), status: $("city-status"), regid: $("city-regid"), pin: $("city-pin"), name: "City sticker" },
-};
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-function buildDateSelectors() {
-  const thisYear = new Date().getFullYear();
-  for (const key of ["plate", "city"]) {
-    const f = fields[key];
-    f.month.innerHTML = MONTHS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("");
-    f.day.innerHTML = Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");
-    f.year.innerHTML = Array.from({ length: 13 }, (_, i) => {
-      const y = thisYear + i;
-      return `<option value="${y}">${y}</option>`;
-    }).join("");
-  }
-}
-
-function getDate(key) {
-  const f = fields[key];
-  const y = Number(f.year.value);
-  const m = String(Number(f.month.value)).padStart(2, "0");
-  const maxDay = new Date(y, Number(f.month.value), 0).getDate();
-  const d = String(Math.min(Number(f.day.value), maxDay)).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function setDate(key, dateStr) {
-  const f = fields[key];
-  const [y, m, d] = dateStr.split("-").map(Number);
-  f.year.value = String(y);
-  f.month.value = String(m);
-  f.day.value = String(d);
-}
-
 let installPrompt = null;
 
+function uid() {
+  return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+}
+
+function newSticker(date) {
+  return { date, cycleYears: 2, regid: "", pin: "" };
+}
+
+function newVehicle(name) {
+  return { id: uid(), name: name || "My Vehicle", plate: newSticker("2026-06-30"), city: newSticker("2026-07-15") };
+}
+
 function defaultData() {
-  return {
-    plate: { date: "2026-06-30", cycleYears: 2, regid: "", pin: "" },
-    city: { date: "2026-07-15", cycleYears: 2, regid: "", pin: "" },
-    notified: {},
-  };
+  return { vehicles: [newVehicle("My Vehicle")], notified: {} };
 }
 
 function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...defaultData(), ...JSON.parse(raw) } : defaultData();
+    if (!raw) return defaultData();
+    const d = JSON.parse(raw);
+    if (Array.isArray(d.vehicles)) return d;
+    if (d.plate || d.city) {
+      return {
+        vehicles: [{
+          id: uid(),
+          name: "My Vehicle",
+          plate: { ...newSticker("2026-06-30"), ...(d.plate || {}) },
+          city: { ...newSticker("2026-07-15"), ...(d.city || {}) },
+        }],
+        notified: d.notified || {},
+      };
+    }
+    return defaultData();
   } catch {
     return defaultData();
   }
 }
 
-function save(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+let state = load();
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 function parseDate(str) {
@@ -90,48 +81,161 @@ function statusText(days) {
   return { text: `${days}d left`, cls: "" };
 }
 
-function updateStatus(key, dateStr) {
-  const { status } = fields[key];
-  const { text, cls } = statusText(daysUntil(dateStr));
-  status.textContent = text;
-  status.className = "badge" + (cls ? ` ${cls}` : "");
-}
-
-function readForm() {
-  return {
-    plate: {
-      date: getDate("plate"),
-      cycleYears: Number(fields.plate.cycle.value),
-      regid: fields.plate.regid.value.trim(),
-      pin: fields.plate.pin.value.trim(),
-    },
-    city: {
-      date: getDate("city"),
-      cycleYears: Number(fields.city.cycle.value),
-      regid: fields.city.regid.value.trim(),
-      pin: fields.city.pin.value.trim(),
-    },
-    notified: load().notified || {},
-  };
-}
-
-function writeForm(data) {
-  setDate("plate", data.plate.date);
-  fields.plate.cycle.value = String(data.plate.cycleYears);
-  fields.plate.regid.value = data.plate.regid || "";
-  fields.plate.pin.value = data.plate.pin || "";
-  setDate("city", data.city.date);
-  fields.city.cycle.value = String(data.city.cycleYears);
-  fields.city.regid.value = data.city.regid || "";
-  fields.city.pin.value = data.city.pin || "";
-  updateStatus("plate", data.plate.date);
-  updateStatus("city", data.city.date);
-}
-
 function messageFor(name, days, dateStr) {
   if (days === 0) return `${name} expires today.`;
   if (days === 1) return `${name} expires tomorrow.`;
   return `${name} expires in ${days} days (${dateStr}).`;
+}
+
+function advanceDate(dateStr, years) {
+  const d = parseDate(dateStr);
+  d.setFullYear(d.getFullYear() + years);
+  return formatDateInput(d);
+}
+
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  for (const c of [].concat(children)) if (c != null) node.append(c);
+  return node;
+}
+
+function ensureOption(select, value) {
+  if (![...select.options].some((o) => o.value === String(value))) {
+    select.append(el("option", { value: String(value), textContent: String(value) }));
+  }
+}
+
+function buildDateSelect(sticker, onChange) {
+  const wrap = el("div", { className: "datesel" });
+  const thisYear = new Date().getFullYear();
+  const monthSel = el("select", { className: "ds-month" });
+  MONTHS.forEach((name, i) => monthSel.append(el("option", { value: String(i + 1), textContent: name })));
+  const daySel = el("select", { className: "ds-day" });
+  for (let i = 1; i <= 31; i++) daySel.append(el("option", { value: String(i), textContent: String(i) }));
+  const yearSel = el("select", { className: "ds-year" });
+  for (let i = 0; i < 13; i++) {
+    const yy = thisYear + i;
+    yearSel.append(el("option", { value: String(yy), textContent: String(yy) }));
+  }
+
+  const apply = () => {
+    const [y, m, d] = sticker.date.split("-").map(Number);
+    ensureOption(yearSel, y);
+    yearSel.value = String(y);
+    monthSel.value = String(m);
+    daySel.value = String(d);
+  };
+
+  const update = () => {
+    const yr = Number(yearSel.value);
+    const mo = Number(monthSel.value);
+    const maxDay = new Date(yr, mo, 0).getDate();
+    const day = Math.min(Number(daySel.value), maxDay);
+    sticker.date = `${yr}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    onChange();
+  };
+
+  [monthSel, daySel, yearSel].forEach((s) => s.addEventListener("change", update));
+  wrap.append(monthSel, daySel, yearSel);
+  apply();
+  return { wrap, refresh: apply };
+}
+
+function buildSticker(vehicle, kindDef) {
+  const sticker = vehicle[kindDef.key];
+
+  const badge = el("span", { className: "badge" });
+  const refreshBadge = () => {
+    const { text, cls } = statusText(daysUntil(sticker.date));
+    badge.textContent = text;
+    badge.className = "badge" + (cls ? ` ${cls}` : "");
+  };
+
+  const onChange = () => { save(); refreshBadge(); };
+
+  const dateSel = buildDateSelect(sticker, onChange);
+
+  const cycle = el("select", {}, [
+    el("option", { value: "1", textContent: "1 year" }),
+    el("option", { value: "2", textContent: "2 years" }),
+  ]);
+  cycle.value = String(sticker.cycleYears);
+  cycle.addEventListener("change", () => { sticker.cycleYears = Number(cycle.value); save(); });
+
+  const regid = el("input", { type: "text", autocomplete: "off", placeholder: kindDef.idph, value: sticker.regid || "" });
+  regid.addEventListener("input", () => { sticker.regid = regid.value.trim(); save(); });
+
+  const pin = el("input", { type: "password", autocomplete: "off", inputMode: "numeric", placeholder: "Renewal PIN", value: sticker.pin || "" });
+  pin.addEventListener("input", () => { sticker.pin = pin.value.trim(); save(); });
+  const reveal = el("button", { type: "button", className: "reveal", textContent: "Show" });
+  reveal.addEventListener("click", () => {
+    const show = pin.type === "password";
+    pin.type = show ? "text" : "password";
+    reveal.textContent = show ? "Hide" : "Show";
+  });
+
+  const undo = el("button", { type: "button", className: "ghost undo hidden", textContent: "Undo" });
+  let prevDate = null;
+  const renew = el("button", { type: "button", className: "ghost", textContent: "Renewed today" });
+  renew.addEventListener("click", () => {
+    const next = advanceDate(formatDateInput(new Date()), sticker.cycleYears);
+    if (!confirm(`Renewed today? Next ${kindDef.label} reminder will be ${next}.`)) return;
+    prevDate = sticker.date;
+    sticker.date = next;
+    state.notified = {};
+    dateSel.refresh();
+    onChange();
+    checkReminders(true);
+    undo.classList.remove("hidden");
+  });
+  undo.addEventListener("click", () => {
+    if (prevDate == null) return;
+    sticker.date = prevDate;
+    prevDate = null;
+    dateSel.refresh();
+    onChange();
+    undo.classList.add("hidden");
+  });
+
+  refreshBadge();
+
+  return el("div", { className: "sticker" }, [
+    el("div", { className: "sticker-head" }, [el("h3", { textContent: kindDef.label }), badge]),
+    el("div", { className: "field" }, [el("span", { textContent: "Renewal date" }), dateSel.wrap]),
+    el("label", { className: "field" }, [el("span", { textContent: "Renews every" }), cycle]),
+    el("label", { className: "field" }, [el("span", { textContent: "Register ID" }), regid]),
+    el("label", { className: "field" }, [
+      el("span", { textContent: "PIN" }),
+      el("div", { className: "secret" }, [pin, reveal]),
+    ]),
+    el("div", { className: "row" }, [renew, undo]),
+  ]);
+}
+
+function buildVehicleCard(vehicle) {
+  const card = el("section", { className: "card vehicle" });
+
+  const nameInput = el("input", { className: "vname", type: "text", value: vehicle.name, placeholder: "Vehicle name" });
+  nameInput.addEventListener("input", () => { vehicle.name = nameInput.value; save(); });
+
+  const del = el("button", { type: "button", className: "del", textContent: "Remove" });
+  del.addEventListener("click", () => {
+    if (!confirm(`Remove "${vehicle.name}"?`)) return;
+    state.vehicles = state.vehicles.filter((v) => v.id !== vehicle.id);
+    save();
+    card.remove();
+  });
+
+  card.append(el("div", { className: "card-head" }, [nameInput, del]));
+  for (const kd of KINDS) card.append(buildSticker(vehicle, kd));
+  return card;
+}
+
+function render() {
+  const container = $("vehicles");
+  container.innerHTML = "";
+  for (const v of state.vehicles) container.append(buildVehicleCard(v));
 }
 
 async function ensurePermission() {
@@ -151,32 +255,24 @@ async function showNotification(title, body, tag) {
   new Notification(title, { body, tag, icon: "./icon.svg" });
 }
 
-function todayKey() {
-  return formatDateInput(new Date());
-}
-
-async function checkReminders(data, forceNotify = false) {
+async function checkReminders(force = false) {
   const ok = await ensurePermission();
   if (!ok) return;
-
-  const notified = { ...data.notified };
-  const today = todayKey();
-
-  for (const key of ["plate", "city"]) {
-    const item = data[key];
-    const days = daysUntil(item.date);
-    if (!REMIND_DAYS.includes(days)) continue;
-
-    const notifyId = `${key}-${days}-${item.date}`;
-    if (!forceNotify && notified[notifyId] === today) continue;
-
-    const body = messageFor(fields[key].name, days, item.date);
-    await showNotification("Sticker Reminder", body, notifyId);
-    notified[notifyId] = today;
+  const today = formatDateInput(new Date());
+  state.notified = state.notified || {};
+  for (const v of state.vehicles) {
+    for (const kd of KINDS) {
+      const s = v[kd.key];
+      const days = daysUntil(s.date);
+      if (!REMIND_DAYS.includes(days)) continue;
+      const id = `${v.id}-${kd.key}-${days}-${s.date}`;
+      if (!force && state.notified[id] === today) continue;
+      const body = `${v.name} — ${messageFor(kd.label, days, s.date)}`;
+      await showNotification("Sticker Reminder", body, id);
+      state.notified[id] = today;
+    }
   }
-
-  data.notified = notified;
-  save(data);
+  save();
 }
 
 function reminderDates(dateStr) {
@@ -195,25 +291,17 @@ function toIcsDate(date) {
 }
 
 function downloadCalendar() {
-  const data = readForm();
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Sticker Reminder//EN",
-    "CALSCALE:GREGORIAN",
-  ];
-
-  for (const key of ["plate", "city"]) {
-    const item = data[key];
-    for (const r of reminderDates(item.date)) {
-      const uid = `${key}-${r.days}-${item.date}@sticker-reminder`;
-      const summary = messageFor(fields[key].name, r.days, item.date);
-      const start = toIcsDate(r.date);
-      const end = toIcsDate(new Date(r.date.getTime() + 3600000));
-      lines.push("BEGIN:VEVENT", `UID:${uid}`, `DTSTART:${start}`, `DTEND:${end}`, `SUMMARY:${summary}`, "END:VEVENT");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Sticker Reminder//EN", "CALSCALE:GREGORIAN"];
+  for (const v of state.vehicles) {
+    for (const kd of KINDS) {
+      const s = v[kd.key];
+      for (const r of reminderDates(s.date)) {
+        const id = `${v.id}-${kd.key}-${r.days}-${s.date}@sticker-reminder`;
+        const summary = `${v.name} — ${messageFor(kd.label, r.days, s.date)}`;
+        lines.push("BEGIN:VEVENT", `UID:${id}`, `DTSTART:${toIcsDate(r.date)}`, `DTEND:${toIcsDate(new Date(r.date.getTime() + 3600000))}`, `SUMMARY:${summary}`, "END:VEVENT");
+      }
     }
   }
-
   lines.push("END:VCALENDAR");
   const blob = new Blob([lines.join("\r\n")], { type: "text/calendar" });
   const a = document.createElement("a");
@@ -223,45 +311,19 @@ function downloadCalendar() {
   URL.revokeObjectURL(a.href);
 }
 
-function advanceDate(dateStr, years) {
-  const d = parseDate(dateStr);
-  d.setFullYear(d.getFullYear() + years);
-  return formatDateInput(d);
-}
-
-let lastRenew = null;
-
-function markRenewed(key) {
-  const data = readForm();
-  const years = data[key].cycleYears;
-  const newDate = advanceDate(formatDateInput(new Date()), years);
-  if (!confirm(`Renewed today? Next ${fields[key].name} reminder will be ${newDate}.`)) return;
-  lastRenew = { key, prevDate: data[key].date };
-  data[key].date = newDate;
-  data.notified = {};
-  writeForm(data);
-  save(data);
-  checkReminders(data, true);
-  $(`${key}-undo`).classList.remove("hidden");
-}
-
-function undoRenew(key) {
-  if (!lastRenew || lastRenew.key !== key) return;
-  const data = readForm();
-  data[key].date = lastRenew.prevDate;
-  data.notified = {};
-  writeForm(data);
-  save(data);
-  lastRenew = null;
-  $(`${key}-undo`).classList.add("hidden");
-}
-
 async function registerSW() {
   if (!("serviceWorker" in navigator)) return;
   try {
     await navigator.serviceWorker.register("./sw.js");
   } catch {}
 }
+
+$("add-vehicle").addEventListener("click", () => {
+  const v = newVehicle(`Vehicle ${state.vehicles.length + 1}`);
+  state.vehicles.push(v);
+  save();
+  $("vehicles").append(buildVehicleCard(v));
+});
 
 $("calendar-btn").addEventListener("click", downloadCalendar);
 
@@ -271,37 +333,9 @@ $("save-btn").addEventListener("click", async () => {
     alert("Allow notifications to get reminders.");
     return;
   }
-  const data = readForm();
-  save(data);
-  updateStatus("plate", data.plate.date);
-  updateStatus("city", data.city.date);
-  await checkReminders(data, true);
+  save();
+  await checkReminders(true);
   alert("Saved. Open this app on your phone to get reminders.");
-});
-
-document.querySelectorAll("[data-renew]").forEach((btn) => {
-  btn.addEventListener("click", () => markRenewed(btn.dataset.renew));
-});
-
-document.querySelectorAll("[data-undo]").forEach((btn) => {
-  btn.addEventListener("click", () => undoRenew(btn.dataset.undo));
-});
-
-document.querySelectorAll("[data-reveal]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const input = $(btn.dataset.reveal);
-    const show = input.type === "password";
-    input.type = show ? "text" : "password";
-    btn.textContent = show ? "Hide" : "Show";
-  });
-});
-
-["plate", "city"].forEach((key) => {
-  ["month", "day", "year"].forEach((part) => {
-    fields[key][part].addEventListener("change", () => {
-      updateStatus(key, getDate(key));
-    });
-  });
 });
 
 window.addEventListener("beforeinstallprompt", (e) => {
@@ -323,14 +357,12 @@ if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.navigator.standalon
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") checkReminders(load());
+  if (document.visibilityState === "visible") checkReminders();
 });
 
 (async () => {
   await registerSW();
-  buildDateSelectors();
-  const data = load();
-  writeForm(data);
-  await checkReminders(data);
-  setInterval(() => checkReminders(load()), 60 * 60 * 1000);
+  render();
+  await checkReminders();
+  setInterval(() => checkReminders(), 60 * 60 * 1000);
 })();

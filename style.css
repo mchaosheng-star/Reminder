@@ -61,6 +61,58 @@ header h1 {
   font-weight: 600;
 }
 
+.vname {
+  flex: 1;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  border: none;
+  border-bottom: 2px solid #e5e7eb;
+  border-radius: 0;
+  padding: 4px 2px;
+  background: transparent;
+}
+
+.vname:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.del {
+  background: #fef2f2;
+  color: var(--danger);
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.sticker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid #eef0f3;
+}
+
+.sticker-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.sticker-head h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.add {
+  width: 100%;
+  border: 1px dashed #cbd5e1;
+  color: var(--accent);
+}
+
 .badge {
   font-size: 0.8rem;
   font-weight: 600;
