@@ -18,7 +18,8 @@
         {
           "sounds": []
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }
